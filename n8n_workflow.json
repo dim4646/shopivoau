@@ -1,0 +1,109 @@
+{
+  "name": "Gmail Supatech → Supabase → NotebookLM",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [{ "mode": "everyMinute" }]
+        },
+        "filters": {
+          "labelIds": ["Label_Supatech"],
+          "readStatus": "unread"
+        },
+        "options": {}
+      },
+      "id": "gmail-trigger",
+      "name": "Gmail - Νέο email στο Supatech",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "position": [240, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "emails",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "message_id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "date",
+              "fieldValue": "={{ $json.internalDate ? new Date(parseInt($json.internalDate)).toISOString() : new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "from_email",
+              "fieldValue": "={{ ($json.payload?.headers?.find(h => h.name === 'From')?.value || '').match(/<(.+)>/)?.[1] || ($json.payload?.headers?.find(h => h.name === 'From')?.value || '').toLowerCase() }}"
+            },
+            {
+              "fieldId": "from_name",
+              "fieldValue": "={{ ($json.payload?.headers?.find(h => h.name === 'From')?.value || '').split('<')[0].trim().replace(/\"/g,'') }}"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $json.payload?.headers?.find(h => h.name === 'Subject')?.value || '(χωρίς θέμα)' }}"
+            },
+            {
+              "fieldId": "body_text",
+              "fieldValue": "={{ $json.snippet || '' }}"
+            },
+            {
+              "fieldId": "labels",
+              "fieldValue": "={{ $json.labelIds || [] }}"
+            }
+          ]
+        },
+        "options": {
+          "onConflict": "ignore"
+        }
+      },
+      "id": "supabase-insert",
+      "name": "Supabase - Αποθήκευση email",
+      "type": "n8n-nodes-base.supabase",
+      "position": [480, 300],
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-cred",
+          "name": "Supabase - emails"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "driveId": "My Drive",
+        "fileId": {
+          "value": "ΒΑΛΕ_ΕΔΩ_ΤΟ_FILE_ID_ΤΟΥ_NOTEBOOKLM_ΑΡΧΕΙΟΥ",
+          "__rl": true,
+          "mode": "id"
+        },
+        "content": "=\n======================================================================\nNEW EMAIL\nΗμερομηνία: {{ new Date(parseInt($('Gmail - Νέο email στο Supatech').item.json.internalDate)).toLocaleDateString('el-GR') }}\nΑποστολέας: {{ $('Gmail - Νέο email στο Supatech').item.json.payload?.headers?.find(h => h.name === 'From')?.value }}\nΘέμα: {{ $('Gmail - Νέο email στο Supatech').item.json.payload?.headers?.find(h => h.name === 'Subject')?.value }}\n──────────────────────────────────────────────────────────────────────\n{{ $('Gmail - Νέο email στο Supatech').item.json.snippet }}\n"
+      },
+      "id": "gdrive-append",
+      "name": "Google Drive - Ενημέρωση NotebookLM αρχείου",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [720, 300],
+      "typeVersion": 3,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "gdrive-cred",
+          "name": "Google Drive"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gmail - Νέο email στο Supatech": {
+      "main": [[{ "node": "Supabase - Αποθήκευση email", "type": "main", "index": 0 }]]
+    },
+    "Supabase - Αποθήκευση email": {
+      "main": [[{ "node": "Google Drive - Ενημέρωση NotebookLM αρχείου", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
